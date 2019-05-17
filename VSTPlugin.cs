@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Auditor : an audio plugin host
-Copyright (C) 2005-2018  George E Greaney
+Transonic VST Library
+Copyright (C) 2005-2019  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,121 +22,197 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
-using AuditorA.UI;
 
-namespace Transonic.Wave.VST
+using Audimat;
+using Audimat.UI;
+
+namespace Transonic.VST
 {
     public class VSTPlugin
     {
-        public VSTPanel panel;
-        public Auditor auditorA;
-        public String filename;
-        public int plugnum;        
+        //- plugin exports ------------------------------------------------------------
 
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiSetPluginAudioIn(int vstnum, int audioidx);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiSetPluginAudioOut(int vstnum, int audioidx);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiGetPluginInfo(int vstnum, ref PluginInfo pinfo);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern String VashtiGetParamName(int vstnum, int paramnum);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern float VashtiGetParamValue(int vstnum, int paramnum);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiSetParamValue(int vstnum, int paramnum, float paramval);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern String VashtiGetProgramName(int vstnum, int prognum);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiSetProgram(int vstnum, int prognum);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiOpenEditor(int vstnum, IntPtr hwnd);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiCloseEditor(int vstnum);
+
+        [DllImport("Vashti.DLL", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void VashtiHandleMidiMsg(int vstnum, int b1, int b2, int b3);
+
+        //---------------------------------------------------------------------
+
+        public VSTHost host;
+        public String filename;
+
+        public int audioInIdx;
+        public int audioOutIdx;
+
+        //these are supplied by the plugin
+        public int id;
         public String name;
         public String vendor;
-        public int version; 
+        public int version;
         public int numPrograms;
         public int numParams;
         public int numInputs;
         public int numOutputs;
         public int flags;
         public int uniqueID;
+
+        public VSTParam[] parameters;
+        public VSTProgram[] programs;
+        int curProgramNum;
+
+        public bool hasEditor;
         public int editorWidth;
         public int editorHeight;
 
-        public VSTParam[] parameters;
-        public String[] programs;
-        int curProgramNum;
-
-        public VSTPlugin(VSTPanel _panel, Auditor _auditorA, int _plugnum, String _filename)
+        //cons
+        public VSTPlugin(VSTHost _host, String _filename, int _id)
         {
-            panel = _panel;
-            auditorA = _auditorA;
-            plugnum = _plugnum;
-            filename = _filename;        
-        }
+            host = _host;
+            filename = _filename;
+            id = _id;
 
-        public bool load()
-        {
-            bool result = auditorA.loadPlugin(plugnum, filename);
-            if (result)
+            //-1 == not set yet
+            audioInIdx = -1;
+            audioOutIdx = -1;
+
+            //get info from plugin
+            PluginInfo pluginfo = new PluginInfo();
+            getPluginInfo(ref pluginfo);
+            name = pluginfo.name;
+            vendor = pluginfo.vendor;
+            version = pluginfo.version;
+            numPrograms = pluginfo.numPrograms;
+            numParams = pluginfo.numParameters;
+            numInputs = pluginfo.numInputs;
+            numOutputs = pluginfo.numOutputs;
+            flags = pluginfo.flags;
+            uniqueID = pluginfo.uniqueID;
+            editorWidth = pluginfo.editorWidth;
+            editorHeight = pluginfo.editorHeight;
+
+            parameters = new VSTParam[numParams];
+            for (int i = 0; i < numParams; i++)
             {
-                PluginInfo pluginfo = new PluginInfo();
-                auditorA.getPluginInfo(plugnum, ref pluginfo);
-                name = pluginfo.name;
-                vendor = pluginfo.vendor;
-                version = pluginfo.version;
-                numPrograms = pluginfo.numPrograms;
-                numParams = pluginfo.numParameters;
-                numInputs = pluginfo.numInputs;
-                numOutputs = pluginfo.numOutputs;
-                flags = pluginfo.flags;
-                uniqueID = pluginfo.uniqueID;
-                editorWidth = pluginfo.editorWidth;
-                editorHeight = pluginfo.editorHeight;
-
-                parameters = new VSTParam[numParams];
-                for (int i = 0; i < numParams; i++)
-                {
-                    String paramName = auditorA.getPluginParamName(plugnum, i);
-                    float paramVal = auditorA.getPluginParamValue(plugnum, i);
-                    parameters[i] = new VSTParam(i, paramName, paramVal);                    
-                }
-
-                if (numPrograms > 0)
-                {
-                    programs = new String[numPrograms];
-                    for (int i = 0; i < numPrograms; i++)
-                    {
-                        String progName = auditorA.getPluginProgramName(plugnum, i);
-                        programs[i] = progName;
-                    }
-                }
-                else
-                {
-                    programs = new String[]{"no programs"};
-                }
-                curProgramNum = 0;
-
+                String paramName = getParamName(i);
+                float paramVal = getParamValue(i);
+                parameters[i] = new VSTParam(i, paramName, paramVal);
             }
-            return result;
+
+            if (numPrograms > 0)
+            {
+                programs = new VSTProgram[numPrograms];
+                for (int i = 0; i < numPrograms; i++)
+                {
+                    String progName = getProgramName(i);
+                    programs[i] = new VSTProgram(i, progName);
+                }
+            }
+            else
+            {
+                programs = new VSTProgram[1];
+                programs[0] = new VSTProgram(0, "no programs");
+            }
+            curProgramNum = 0;
         }
 
-        public void unload()
+        //- settings ----------------------------------------------------------
+
+        public void setAudioIn(int idx)
         {
-            auditorA.unloadPlugin(plugnum);
+            if (audioInIdx != idx)
+            {
+                audioInIdx = idx;
+            }
         }
 
-        public void setCurrent()
+        public void setAudioOut(int idx)
         {
-            auditorA.selectPlugin(plugnum);
+            if (audioOutIdx != idx)
+            {
+                audioOutIdx = idx;
+            }
         }
 
-        public void setParamValue(int paramNum, float paramVal) 
+        //- backend methods ----------------------------------------------------------
+
+        public void getPluginInfo(ref PluginInfo pluginfo)
         {
-            parameters[paramNum].value = paramVal;
-            auditorA.setPluginParam(plugnum, paramNum, paramVal);
+            VashtiGetPluginInfo(id, ref pluginfo);
         }
 
-        public void setProgram(int progNum)
+        public String getParamName(int paramnum)
         {
-            curProgramNum = progNum;
-            auditorA.setPluginProgram(plugnum, progNum);
+            return VashtiGetParamName(id, paramnum);
         }
 
-        public void openEditorWindow(IntPtr editorWindow)
+        public float getParamValue(int paramnum)
         {
-            auditorA.openEditorWindow(plugnum, editorWindow);
+            return VashtiGetParamValue(id, paramnum);
+        }
+
+        public void setParamValue(int paramnum, float paramval)
+        {
+            parameters[paramnum].value = paramval;
+            VashtiSetParamValue(id, paramnum, paramval);
+        }
+
+        public String getProgramName(int prognum)
+        {
+            return VashtiGetProgramName(id, prognum);
+        }
+
+        public void setProgram(int prognum)
+        {
+            curProgramNum = prognum;
+            VashtiSetProgram(id, prognum);
+        }
+
+        public void openEditorWindow(IntPtr hwnd)
+        {
+            VashtiOpenEditor(id, hwnd);
         }
 
         public void closeEditorWindow()
         {
-            auditorA.closeEditorWindow(plugnum);
+            VashtiCloseEditor(id);
+        }
+
+        public void sendShortMidiMessage(int b1, int b2, int b3)
+        {
+            VashtiHandleMidiMsg(id, b1, b2, b3);
         }
     }
 
-//-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
 
     [StructLayout(LayoutKind.Sequential)]
     public struct PluginInfo
@@ -168,17 +244,22 @@ namespace Transonic.Wave.VST
         }
     }
 
-    //public class VSTProgram
-    //{
-    //    public int num;
-    //    public String name;
+    public class VSTProgram
+    {
+        public int num;
+        public String _name;
 
-    //    public VSTProgram(int _num, String _name)
-    //    {
-    //        num = _num;
-    //        name = _name;
-    //    }
-    //}
+        public String name
+        {
+            get { return _name; }
+        }
+
+        public VSTProgram(int _num, String __name)
+        {
+            num = _num;
+            _name = __name;
+        }
+    }
 }
 
 //Console.WriteLine(" plugin " + name + " parameter " + i + " name is " + paramName);
