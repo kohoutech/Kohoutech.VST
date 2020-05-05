@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic VST Library
-Copyright (C) 2005-2019  George E Greaney
+Kohoutech VST Library
+Copyright (C) 2005-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -23,10 +23,10 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 
-using Audimat;
-using Audimat.UI;
+//using Audimat;
+//using Audimat.UI;
 
-namespace Transonic.VST
+namespace Kohoutech.VST
 {
     public class VSTPlugin
     {
@@ -138,8 +138,9 @@ namespace Transonic.VST
             }
             else
             {
-                programs = new VSTProgram[1];
-                programs[0] = new VSTProgram(0, "no programs");
+                //programs = new VSTProgram[1];
+                programs = null;
+                //programs[0] = new VSTProgram(0, "no programs");
             }
             curProgramNum = 0;
         }
@@ -209,7 +210,7 @@ namespace Transonic.VST
         public void sendShortMidiMessage(int b1, int b2, int b3)
         {
             VashtiHandleMidiMsg(id, b1, b2, b3);
-        }
+        }        
     }
 
     //-----------------------------------------------------------------------------
@@ -262,4 +263,4 @@ namespace Transonic.VST
     }
 }
 
-//Console.WriteLine(" plugin " + name + " parameter " + i + " name is " + paramName);
+//  Console.WriteLine(" there's no sun in the shadow of the wizard");

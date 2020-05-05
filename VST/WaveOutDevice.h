@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
-Transonic VST Library
-Copyright (C) 2005-2019  George E Greaney
+Kohoutech VST Library
+Copyright (C) 2005-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
